@@ -53,9 +53,14 @@ class RAGSearch:
             chunk_size=1000,
             chunk_overlap=200
         )
-        
+
+        # 创建带metadata的Document对象
+        doc_objects = []
+        for i, doc in enumerate(documents):
+            metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
+            doc_objects.append(Document(page_content=doc, metadata=metadata))
+
         # 分割文档
-        doc_objects = [Document(page_content=doc) for doc in documents]
         chunks = text_splitter.split_documents(doc_objects)
         
         # 添加到向量数据库

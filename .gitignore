@@ -1,2 +1,5 @@
 .env
 shell_agent\__pycache__
+.idea
+.venv
+chroma_db
