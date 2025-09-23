@@ -1,100 +1,75 @@
-# Shell智能体
+# Shell Agent
 
-基于LangChain的智能Shell助手，能够根据自然语言输入生成并执行Shell命令，并提供错误分析和解决方案。
+Shell Agent 是一个基于 LangChain 和大语言模型（LLM）构建的智能 Shell 命令助手。它能理解自然语言描述的用户需求，自动生成、执行相应的 Shell 命令，并能从执行历史中学习，分析错误。
 
-## 功能特点
+## 核心功能
 
-- 🤖 **自然语言转Shell命令**：根据用户的自然语言描述生成对应的Shell命令
-- ⚙️ **自动执行命令**：自动运行生成的Shell命令并返回结果
-- 🔍 **错误分析与解决**：当命令执行失败时，自动分析错误并提供解决方案
-- 📚 **RAG搜索增强**：利用检索增强生成(RAG)技术，基于历史命令提供更准确的结果
-- 🧠 **命令历史记忆**：记住之前执行过的命令，并在相似情况下提供参考
-
-## 安装说明
-
-### 前提条件
-
-- Python 3.8+
-- OpenAI API密钥
-
-### 安装步骤
-
-1. 克隆或下载本项目到本地
-
-2. 安装依赖包
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. 创建`.env`文件并添加您的OpenAI API密钥
-   ```
-   OPENAI_API_KEY=your_api_key_here
-   ```
-
-## 使用方法
-
-### 基本用法
-
-运行主程序：
-
-```
-python main.py
-```
-
-然后按照提示输入您的需求，智能体将生成并执行相应的Shell命令。
-
-### 高级选项
-
-您可以通过命令行参数自定义智能体的行为：
-
-```
-python main.py --model gpt-4 --db-dir ./my_chroma_db
-```
-
-参数说明：
-- `--model`：指定使用的OpenAI模型（默认：gpt-3.5-turbo）
-- `--db-dir`：指定RAG向量数据库的存储目录（默认：./chroma_db）
+- **自然语言到 Shell 命令**：将“列出当前目录下最大的三个文件”这样的自然语言直接转化为可执行的 Shell 命令。
+- **命令自动执行**：无缝执行生成的命令，并返回执行结果或错误信息。
+- **错误分析**：当命令执行失败时，Agent 会尝试分析错误原因并提供解决方案。
+- **RAG 增强**：通过检索相似的历史成功/失败案例，提高生成命令的准确性。
+- **历史记录**：将所有成功的命令执行历史保存到向量数据库中，用于未来的检索增强。
 
 ## 项目结构
 
+经过优化后，项目采用了更清晰、更模块化的结构：
+
 ```
 shell_agent/
-├── __init__.py
-├── agent.py           # 智能体主类
-├── shell_generator.py # Shell命令生成模块
-├── shell_executor.py  # Shell命令执行模块
-├── error_analyzer.py  # 错误分析模块
-└── rag_search.py      # RAG搜索增强模块
-main.py                # 主程序入口
-requirements.txt       # 依赖包列表
-README.md             # 项目说明文档
+├── __init__.py         # 包初始化文件
+├── agent.py            # 核心 Agent 类，负责协调和规划
+├── error_analyzer.py   # 错误分析模块
+├── param_model.py      # 工具参数的 Pydantic 模型
+├── rag_search.py       # RAG 检索和历史记录模块
+└── shell_executor.py   # Shell 命令执行模块
 ```
 
-## 示例
+## 安装与配置
 
-以下是一些使用示例：
+1.  **克隆项目**
+    ```bash
+    git clone <your-repo-url>
+    cd <your-repo-name>
+    ```
 
-1. **查找大文件**
-   ```
-   🧠 请输入您的需求: 找出当前目录下最大的5个文件
-   ```
+2.  **安装依赖**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-2. **系统信息查询**
-   ```
-   🧠 请输入您的需求: 显示系统内存和CPU使用情况
-   ```
+3.  **配置环境变量**
+    项目需要 OpenAI 的 API 密钥才能工作。请在您的执行环境中设置以下环境变量：
+    ```bash
+    export OPENAI_API_KEY="your-openai-api-key"
+    ```
 
-3. **文件操作**
-   ```
-   🧠 请输入您的需求: 将所有的txt文件移动到一个新的文件夹中
-   ```
+## 使用示例
 
-## 注意事项
+以下是如何在 Python 代码中使用 `ShellAgent` 的一个简单示例：
 
-- 本项目会执行生成的Shell命令，请确保您了解这些命令的作用，以避免意外操作。
-- 在Windows环境中，命令将通过PowerShell执行。
-- 需要有效的OpenAI API密钥才能使用此应用程序。
+```python
+from shell_agent.agent import ShellAgent
 
-## 许可证
+# 1. 初始化 Agent
+# 你可以指定使用的模型和 RAG 数据库的持久化路径
+shell_agent = ShellAgent(model_name="gpt-4", rag_persist_directory="./shell_commands_db")
 
-MIT
+# 2. 处理用户输入
+user_request = "在当前目录创建一个名为 'test_dir' 的新目录"
+result = shell_agent.process_input(user_request)
+
+# 3. 查看结果
+print(f"用户请求: {user_request}")
+print("-" * 20)
+
+# 从返回结果中安全地获取命令
+command = result.get("command", "未能提取命令")
+print(f"生成的命令: {command}")
+
+# 查看执行输出
+output = result.get("output", "没有输出")
+print(f"执行输出:\n{output}")
+
+# 查看执行状态
+success = result.get("success", False)
+print(f"执行是否成功: {success}")

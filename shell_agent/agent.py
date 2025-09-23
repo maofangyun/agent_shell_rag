@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import StructuredTool, Tool
 from langchain_openai import ChatOpenAI
 
-from .param_model import SaveCommandHistoryParams
+from .param_model import SaveCommandHistoryParams, AnalyzeCommandErrorParams
 from .shell_executor import ShellExecutor
 from .error_analyzer import ErrorAnalyzer
 from .rag_search import RAGSearch
@@ -38,10 +38,11 @@ class ShellAgent:
                 func=self.shell_executor.execute_command,
                 description="执行shell命令并返回一个元组(success: bool, output: str)。"
             ),
-            Tool(
-                name="analyze_command_error",
+            StructuredTool.from_function(
                 func=self.error_analyzer.analyze_error,
-                description="分析shell命令执行错误并提供解决方案。需要'user_input', 'command', 'error_message'作为参数。"
+                name="analyze_command_error",
+                description="分析shell命令执行错误并提供解决方案。",
+                args_schema=AnalyzeCommandErrorParams
             ),
             StructuredTool.from_function(
                 func=self.rag_search.add_shell_command_history,
