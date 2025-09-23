@@ -7,10 +7,6 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
-from dotenv import load_dotenv
-
-# 加载环境变量
-load_dotenv()
 
 class RAGSearch:
     """RAG搜索增强类，用于提供相关知识支持"""

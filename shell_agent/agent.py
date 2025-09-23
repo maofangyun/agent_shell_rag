@@ -18,10 +18,10 @@ class ShellAgent:
     def __init__(self, model_name: str = "gpt-3.5-turbo", rag_persist_directory: str = "./chroma_db"):
         """初始化Shell智能体"""
         self.shell_executor = ShellExecutor()
-        self.error_analyzer = ErrorAnalyzer(model_name=model_name)
+        self.llm = ChatOpenAI(model=model_name, temperature=0)
+        self.error_analyzer = ErrorAnalyzer(llm=self.llm)
         self.rag_search = RAGSearch(persist_directory=rag_persist_directory)
         
-        self.llm = ChatOpenAI(model=model_name, temperature=0)
         self.tools = self._create_tools()
         self.agent_executor = self._create_agent_executor()
 

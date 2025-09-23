@@ -4,18 +4,19 @@
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 
 class ErrorAnalyzer:
     """分析命令执行错误并提供解决方案的类"""
     
-    def __init__(self, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, llm: BaseChatModel):
         """初始化错误分析器
         
         Args:
-            model_name: 使用的OpenAI模型名称
+            llm: 一个实现了BaseChatModel接口的语言模型实例。
         """
-        self.llm = ChatOpenAI(model_name=model_name)
+        self.llm = llm
         self.prompt = ChatPromptTemplate.from_template(
             """你是一个专业的Shell错误分析专家。
             分析以下命令执行错误，并提供详细的解决方案。
