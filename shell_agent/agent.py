@@ -21,7 +21,7 @@ class ShellAgent:
         self.llm = ChatOpenAI(model=model_name, temperature=0)
         self.error_analyzer = ErrorAnalyzer(llm=self.llm)
         self.rag_search = RAGSearch(persist_directory=rag_persist_directory)
-        
+
         self.tools = self._create_tools()
         self.agent_executor = self._create_agent_executor()
 
@@ -71,9 +71,9 @@ class ShellAgent:
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad")
         ])
-        
+
         agent = create_openai_tools_agent(self.llm, self.tools, prompt)
-        
+
         return AgentExecutor(
             agent=agent,
             tools=self.tools,
@@ -82,6 +82,39 @@ class ShellAgent:
             return_intermediate_steps=True
         )
 
+    def _extract_command_info(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """从Agent执行结果中提取命令执行信息"""
+        command = ""
+        success = False
+        output = result.get("output", "")
+        error_analysis = ""
+
+        for step in result.get("intermediate_steps", []):
+            tool_name = step[0].tool
+            tool_input = step[0].tool_input
+            tool_output = step[1]
+
+            if tool_name == "execute_shell_command":
+                # 提取命令
+                if isinstance(tool_input, str):
+                    command = tool_input
+                elif isinstance(tool_input, dict) and 'command' in tool_input:
+                    command = tool_input['command']
+
+                # 提取执行结果
+                if isinstance(tool_output, tuple) and len(tool_output) == 2:
+                    success, output = tool_output
+
+            elif tool_name == "analyze_command_error" and isinstance(tool_output, str):
+                error_analysis = tool_output
+
+        return {
+            "command": command,
+            "success": success,
+            "output": output,
+            "error_analysis": error_analysis
+        }
+
     def process_input(self, user_input: str) -> Dict[str, Any]:
         """
         处理用户输入，通过Agent协调工具执行，并返回结构化结果。
@@ -89,47 +122,32 @@ class ShellAgent:
         try:
             # Agent执行核心任务
             result = self.agent_executor.invoke({"input": user_input})
-            
-            # 补充相似命令的搜索结果（用于前端展示）
+
+            # 提取命令执行信息
+            command_info = self._extract_command_info(result)
+
+            # 获取相似命令
             similar_commands = self.rag_search.get_similar_commands(user_input)
-            result["similar_commands"] = similar_commands
 
-            # 从中间步骤中提取关键信息，以确保返回结果的结构一致性
-            command = ""
-            success = False
-            output = result.get("output", "")
+            return {
+                "command": command_info["command"],
+                "success": command_info["success"],
+                "output": command_info["output"],
+                "error_analysis": command_info["error_analysis"],
+                "similar_commands": similar_commands,
+                "intermediate_steps": result.get("intermediate_steps", [])
+            }
 
-            for step in result.get("intermediate_steps", []):
-                tool_name = step[0].tool
-                tool_input = step[0].tool_input
-                tool_output = step[1]
-
-                if tool_name == "execute_shell_command":
-                    # tool_input is the command
-                    if isinstance(tool_input, str):
-                        command = tool_input
-                    elif isinstance(tool_input, dict) and 'command' in tool_input:
-                        command = tool_input['command']
-                    
-                    # tool_output is a tuple (success, output_str)
-                    if isinstance(tool_output, tuple) and len(tool_output) == 2:
-                        success, output = tool_output
-
-            # 将提取的信息统一添加到结果字典中
-            result["command"] = command
-            result["success"] = success
-            # 'output' is already in the result, but we ensure it has the execution output
-            result["output"] = output
-
-            return result
         except Exception as e:
             print(f"Agent执行出错: {str(e)}")
             # 简化降级处理
             return {
                 "input": user_input,
+                "command": "",
+                "success": False,
                 "output": f"处理时发生错误: {e}",
-                "intermediate_steps": [],
+                "error_analysis": "",
                 "similar_commands": self.rag_search.get_similar_commands(user_input),
+                "intermediate_steps": [],
                 "error": str(e)
             }
-    
