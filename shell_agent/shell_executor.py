@@ -53,17 +53,3 @@ class ShellExecutor:
         except Exception as e:
             return False, f"执行命令时出错: {str(e)}"
     
-    def format_result(self, success: bool, output: str) -> Dict[str, Any]:
-        """格式化命令执行结果
-        
-        Args:
-            success: 命令是否成功执行
-            output: 命令的输出或错误信息
-            
-        Returns:
-            Dict[str, Any]: 格式化的结果
-        """
-        return {
-            "success": success,
-            "output": output
-        }

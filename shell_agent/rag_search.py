@@ -1,8 +1,8 @@
 """
 RAG搜索增强模块 - 提供相关知识支持
 """
-from typing import List, Dict, Any
-from langchain_chroma import Chroma
+from typing import List, Dict, Any, Optional
+from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -41,7 +41,7 @@ class RAGSearch:
                 embedding_function=self.embeddings
             )
     
-    def add_documents(self, documents: List[str], metadatas: List[Dict[str, Any]] = None):
+    def add_documents(self, documents: List[str], metadatas: Optional[List[Dict[str, Any]]] = None):
         """添加文档到向量数据库
         
         Args:
@@ -57,6 +57,7 @@ class RAGSearch:
         # 创建带metadata的Document对象
         doc_objects = []
         for i, doc in enumerate(documents):
+            # 确保即使metadatas为None或长度不足时也能安全访问
             metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
             doc_objects.append(Document(page_content=doc, metadata=metadata))
 
@@ -66,19 +67,6 @@ class RAGSearch:
         # 添加到向量数据库
         self.vectordb.add_documents(chunks)
         print(f"已添加 {len(chunks)} 个文档块到向量数据库")
-    
-    def search(self, query: str, k: int = 3) -> List[str]:
-        """搜索相关文档
-        
-        Args:
-            query: 搜索查询
-            k: 返回的结果数量
-            
-        Returns:
-            List[str]: 相关文档内容列表
-        """
-        results = self.vectordb.similarity_search(query, k=k)
-        return [doc.page_content for doc in results]
     
     def add_shell_command_history(self, user_input: str, command: str, result: str, success: bool):
         """添加Shell命令历史到向量数据库
