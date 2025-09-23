@@ -11,6 +11,7 @@ from .param_model import SaveCommandHistoryParams, AnalyzeCommandErrorParams
 from .shell_executor import ShellExecutor
 from .error_analyzer import ErrorAnalyzer
 from .rag_search import RAGSearch
+from .utils import PlatformUtils
 
 class ShellAgent:
     """Shell智能体主类，整合所有功能模块"""
@@ -54,10 +55,25 @@ class ShellAgent:
 
     def _create_agent_executor(self) -> AgentExecutor:
         """创建agent执行器"""
-        system_prompt = """你是一个专业的Shell命令助手。你的任务是根据用户的需求，生成一个合适的shell命令，然后使用 `execute_shell_command` 工具来执行它。
+        # 检测当前操作系统
+        is_windows = PlatformUtils.is_windows()
+        os_type = "Windows" if is_windows else "Linux/macOS"
+        shell_type = "PowerShell" if is_windows else "bash"
+
+        system_prompt = f"""你是一个专业的Shell命令助手。你的任务是根据用户的需求，生成一个合适的shell命令，然后使用 `execute_shell_command` 工具来执行它。
+
+        **系统信息**:
+        
+        - 当前操作系统: {os_type}
+        - 使用shell类型: {shell_type}
+
+        **命令生成规则**:
+        1. 根据当前操作系统生成兼容的命令
+        2. {"如果是Windows系统，优先使用PowerShell命令" if is_windows else "如果是Linux/macOS系统，优先使用bash命令"}
+        3. 确保生成的命令在对应系统上能够正常执行
 
         **工作流程**:
-        1.  **思考并生成**一个shell命令。
+        1.  **思考并生成**一个适合当前系统的shell命令。
         2.  **必须调用** `execute_shell_command` 工具，并将你生成的命令作为参数传入。
         3.  **分析执行结果**：
             - 如果执行**成功** (success=True)，调用 `save_command_history` 工具保存历史。
@@ -65,6 +81,7 @@ class ShellAgent:
 
         - **不要**只生成命令而不执行。
         - 你可以调用 `search_similar_commands` 来获取灵感。
+        - **重要**: 始终考虑当前操作系统，生成兼容的命令。
         """
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
@@ -82,6 +99,15 @@ class ShellAgent:
             return_intermediate_steps=True
         )
 
+    def _post_process_command(self, command: str) -> str:
+        """后处理命令，确保平台兼容性"""
+        if not command:
+            return command
+
+        # 使用命令转换器确保命令适合当前系统
+        from .utils import CommandConverter
+        return CommandConverter.get_system_command(command)
+
     def _extract_command_info(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """从Agent执行结果中提取命令执行信息"""
         command = ""
@@ -95,15 +121,25 @@ class ShellAgent:
             tool_output = step[1]
 
             if tool_name == "execute_shell_command":
-                # 提取命令
+                # 提取命令并进行后处理
                 if isinstance(tool_input, str):
-                    command = tool_input
+                    raw_command = tool_input
                 elif isinstance(tool_input, dict) and 'command' in tool_input:
-                    command = tool_input['command']
+                    raw_command = tool_input['command']
+                else:
+                    raw_command = ""
+
+                # 后处理确保平台兼容性
+                command = self._post_process_command(raw_command)
 
                 # 提取执行结果
                 if isinstance(tool_output, tuple) and len(tool_output) == 2:
-                    success, output = tool_output
+                    success, raw_output = tool_output
+                    # 限制输出长度，避免token超限
+                    if len(raw_output) > 2000:
+                        output = raw_output[:2000] + "\n... (输出已截断)"
+                    else:
+                        output = raw_output
 
             elif tool_name == "analyze_command_error" and isinstance(tool_output, str):
                 error_analysis = tool_output
