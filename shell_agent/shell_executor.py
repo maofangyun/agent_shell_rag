@@ -37,7 +37,7 @@ class ShellExecutor:
             stdout, stderr = process.communicate()
 
             # 返回执行结果
-            return (process.returncode == 0, stdout if process.returncode == 0 else stderr)
+            return process.returncode == 0, stdout if process.returncode == 0 else stderr
 
         except Exception as e:
             return False, f"执行命令时出错: {str(e)}"

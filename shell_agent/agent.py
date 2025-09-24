@@ -13,6 +13,60 @@ from .error_analyzer import ErrorAnalyzer
 from .rag_search import RAGSearch
 from .utils import PlatformUtils
 
+
+def _post_process_command(command: str) -> str:
+    """后处理命令 - 现在由大模型直接生成适合当前系统的命令，这里只做基本清理"""
+    if not command:
+        return command
+
+    # 基本的命令清理，如去除多余空格等
+    return command.strip()
+
+
+def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
+    """从Agent执行结果中提取命令执行信息"""
+    command = ""
+    success = False
+    output = result.get("output", "")
+    error_analysis = ""
+
+    for step in result.get("intermediate_steps", []):
+        tool_name = step[0].tool
+        tool_input = step[0].tool_input
+        tool_output = step[1]
+
+        if tool_name == "execute_shell_command":
+            # 提取命令并进行后处理
+            if isinstance(tool_input, str):
+                raw_command = tool_input
+            elif isinstance(tool_input, dict) and 'command' in tool_input:
+                raw_command = tool_input['command']
+            else:
+                raw_command = ""
+
+            # 后处理确保平台兼容性
+            command = _post_process_command(raw_command)
+
+            # 提取执行结果
+            if isinstance(tool_output, tuple) and len(tool_output) == 2:
+                success, raw_output = tool_output
+                # 限制输出长度，避免token超限
+                if len(raw_output) > 2000:
+                    output = raw_output[:2000] + "\n... (输出已截断)"
+                else:
+                    output = raw_output
+
+        elif tool_name == "analyze_command_error" and isinstance(tool_output, str):
+            error_analysis = tool_output
+
+    return {
+        "command": command,
+        "success": success,
+        "output": output,
+        "error_analysis": error_analysis
+    }
+
+
 class ShellAgent:
     """Shell智能体主类，整合所有功能模块"""
 
@@ -99,58 +153,6 @@ class ShellAgent:
             return_intermediate_steps=True
         )
 
-    def _post_process_command(self, command: str) -> str:
-        """后处理命令，确保平台兼容性"""
-        if not command:
-            return command
-
-        # 使用命令转换器确保命令适合当前系统
-        from .utils import CommandConverter
-        return CommandConverter.get_system_command(command)
-
-    def _extract_command_info(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """从Agent执行结果中提取命令执行信息"""
-        command = ""
-        success = False
-        output = result.get("output", "")
-        error_analysis = ""
-
-        for step in result.get("intermediate_steps", []):
-            tool_name = step[0].tool
-            tool_input = step[0].tool_input
-            tool_output = step[1]
-
-            if tool_name == "execute_shell_command":
-                # 提取命令并进行后处理
-                if isinstance(tool_input, str):
-                    raw_command = tool_input
-                elif isinstance(tool_input, dict) and 'command' in tool_input:
-                    raw_command = tool_input['command']
-                else:
-                    raw_command = ""
-
-                # 后处理确保平台兼容性
-                command = self._post_process_command(raw_command)
-
-                # 提取执行结果
-                if isinstance(tool_output, tuple) and len(tool_output) == 2:
-                    success, raw_output = tool_output
-                    # 限制输出长度，避免token超限
-                    if len(raw_output) > 2000:
-                        output = raw_output[:2000] + "\n... (输出已截断)"
-                    else:
-                        output = raw_output
-
-            elif tool_name == "analyze_command_error" and isinstance(tool_output, str):
-                error_analysis = tool_output
-
-        return {
-            "command": command,
-            "success": success,
-            "output": output,
-            "error_analysis": error_analysis
-        }
-
     def process_input(self, user_input: str) -> Dict[str, Any]:
         """
         处理用户输入，通过Agent协调工具执行，并返回结构化结果。
@@ -160,7 +162,7 @@ class ShellAgent:
             result = self.agent_executor.invoke({"input": user_input})
 
             # 提取命令执行信息
-            command_info = self._extract_command_info(result)
+            command_info = _extract_command_info(result)
 
             # 获取相似命令
             similar_commands = self.rag_search.get_similar_commands(user_input)
