@@ -14,15 +14,6 @@ from .rag_search import RAGSearch
 from .utils import PlatformUtils
 
 
-def _post_process_command(command: str) -> str:
-    """后处理命令 - 现在由大模型直接生成适合当前系统的命令，这里只做基本清理"""
-    if not command:
-        return command
-
-    # 基本的命令清理，如去除多余空格等
-    return command.strip()
-
-
 def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
     """从Agent执行结果中提取命令执行信息"""
     command = ""
@@ -44,8 +35,8 @@ def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
             else:
                 raw_command = ""
 
-            # 后处理确保平台兼容性
-            command = _post_process_command(raw_command)
+            # 后处理命令，如去除多余空格
+            command = raw_command.strip()
 
             # 提取执行结果
             if isinstance(tool_output, tuple) and len(tool_output) == 2:
