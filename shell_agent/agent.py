@@ -14,7 +14,7 @@ from .rag_search import RAGSearch
 from .utils import PlatformUtils
 
 
-def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_command_info(result: Dict[str, Any], max_output_length: int = 2000) -> Dict[str, Any]:
     """从Agent执行结果中提取命令执行信息"""
     command = ""
     success = False
@@ -42,8 +42,8 @@ def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
             if isinstance(tool_output, tuple) and len(tool_output) == 2:
                 success, raw_output = tool_output
                 # 限制输出长度，避免token超限
-                if len(raw_output) > 2000:
-                    output = raw_output[:2000] + "\n... (输出已截断)"
+                if len(raw_output) > max_output_length:
+                    output = raw_output[:max_output_length] + "\n... (输出已截断)"
                 else:
                     output = raw_output
 
@@ -61,12 +61,14 @@ def _extract_command_info(result: Dict[str, Any]) -> Dict[str, Any]:
 class ShellAgent:
     """Shell智能体主类，整合所有功能模块"""
 
-    def __init__(self, model_name: str = "gpt-3.5-turbo", rag_persist_directory: str = "./chroma_db"):
+    def __init__(self, model_name: str = "gpt-3.5-turbo", rag_persist_directory: str = "./chroma_db", 
+                 command_timeout: int = 30, max_output_length: int = 2000):
         """初始化Shell智能体"""
-        self.shell_executor = ShellExecutor()
+        self.shell_executor = ShellExecutor(timeout=command_timeout)
         self.llm = ChatOpenAI(model=model_name, temperature=0)
         self.error_analyzer = ErrorAnalyzer(llm=self.llm)
         self.rag_search = RAGSearch(persist_directory=rag_persist_directory)
+        self.max_output_length = max_output_length
 
         self.tools = self._create_tools()
         self.agent_executor = self._create_agent_executor()
@@ -153,7 +155,7 @@ class ShellAgent:
             result = self.agent_executor.invoke({"input": user_input})
 
             # 提取命令执行信息
-            command_info = _extract_command_info(result)
+            command_info = _extract_command_info(result, self.max_output_length)
 
             # 获取相似命令
             similar_commands = self.rag_search.get_similar_commands(user_input)

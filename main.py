@@ -57,6 +57,8 @@ def main():
     parser = argparse.ArgumentParser(description="Shell智能体 - 基于LangChain的智能Shell助手")
     parser.add_argument("--model", default="gpt-3.5-turbo", help="使用的OpenAI模型名称")
     parser.add_argument("--db-dir", default="./chroma_db", help="RAG向量数据库持久化目录")
+    parser.add_argument("--timeout", type=int, default=30, help="命令执行超时时间（秒）")
+    parser.add_argument("--max-output-length", type=int, default=2000, help="命令输出最大长度")
     args = parser.parse_args()
 
     # 检查OpenAI API密钥
@@ -67,7 +69,12 @@ def main():
 
     # 初始化Shell智能体
     Printer.info(f"初始化Shell智能体 (模型: {args.model})...")
-    agent = ShellAgent(model_name=args.model, rag_persist_directory=args.db_dir)
+    agent = ShellAgent(
+        model_name=args.model, 
+        rag_persist_directory=args.db_dir,
+        command_timeout=args.timeout,
+        max_output_length=args.max_output_length
+    )
     Printer.success("Shell智能体初始化完成!")
 
     Printer.info("欢迎使用Shell智能体! 输入您的需求，智能体将生成并执行相应的Shell命令。")

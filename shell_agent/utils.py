@@ -15,7 +15,7 @@ class PlatformUtils:
         if platform.system() == "Windows":
             return ["powershell", "-Command"]
         else:
-            return ["cmd", "/c"]
+            return ["bash", "-c"]
 
     @staticmethod
     def is_windows() -> bool:
